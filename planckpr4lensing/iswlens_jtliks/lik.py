@@ -137,7 +137,11 @@ class jt_lik:
         ret = np.zeros(self.Npt)
         R_Rf = self.R_Rf(cls) # Ratio of QE estimator response to fiducial response
         for i, b in enumerate(self.barpt):
-            ret[i] = np.sum(b * w_pt(np.arange(len(b))) * cls['pt'][:len(b)] * R_Rf[:len(b)])
+            # ret[i] = np.sum(b * w_pt(np.arange(len(b))) * cls['pt'][:len(b)] * R_Rf[:len(b)]) # changed by me: CLASS uses 'tp' not 'pt'
+            try:
+                ret[i] = np.sum(b * w_pt(np.arange(len(b))) * cls['pt'][:len(b)] * R_Rf[:len(b)])
+            except KeyError:
+                ret[i] = np.sum(b * w_pt(np.arange(len(b))) * cls['tp'][:len(b)] * R_Rf[:len(b)])
         return ret
 
     def _bpredpp(self, cls):
@@ -537,7 +541,8 @@ class cobaya_jtlik(jt_lik):
         self.binned = False
 
         self.Rfid = np.loadtxt(self.folder + '/Rfid.txt')
-        self.w_pt_resp = np.all([spec in self.dRdlncls.keys() for spec in self._specsforresp()])
+        # self.w_pt_resp = np.all([spec in self.dRdlncls.keys() for spec in self._specsforresp()])
+        self.w_pt_resp = bool(np.all([spec in self.dRdlncls.keys() for spec in self._specsforresp()])) # changed by me: bool() to return Bool instead of np.bool, which doesn't work with the print statement below
         print("ISWlensing: OK for resp calc" * self.w_pt_resp)
         if self.w_pt_resp:
             Rtest = np.sum([np.sum(self.dRdlncls[s], axis=1) for s in self._specsforresp()], axis=0)
@@ -758,8 +763,15 @@ class cobaya_jtlikPRXpp(cobaya_jtlik):
         ws = {'TT': w_tt, 'ET': w_tt, 'PP': w_pp, 'EE': w_tt, 'PT': w_pt}
         lab = lambda s: s.lower() if s != 'ET' else 'te'
         req = self.PRX_PP.get_requirements()['Cl']
-        dls = {lab(s): ws[s](np.arange(req[s] + 1)) * cls.get(s.lower(), cls.get(s.lower()[::-1], None))[:req[s] + 1]
-               for s in list(req.keys())}
+        # dls = {lab(s): ws[s](np.arange(req[s] + 1)) * cls.get(s.lower(), cls.get(s.lower()[::-1], None))[:req[s] + 1]
+        #        for s in list(req.keys())}
+        dls = {}
+        for s in list(req.keys()): # changed by me: CLASS uses 'te' not 'et'
+            if s != 'TE':
+                dls[lab(s)] = ws[s](np.arange(req[s] + 1)) * cls.get(s.lower(), cls.get(s.lower()[::-1], None))[:req[s] + 1]
+            else:
+                s2 = 'ET'
+                dls[lab(s)] = ws[s2](np.arange(req[s] + 1)) * cls.get(s.lower(), cls.get(s.lower()[::-1], None))[:req[s] + 1]
         return dls
 
     def _bpredpp(self, cls):
